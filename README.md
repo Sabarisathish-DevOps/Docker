@@ -1,49 +1,56 @@
-Dockerfile(detailing):
+# Dockerfile for Node.js Application
 
-*) This is multistage Dockerfile, which is used for node application.
+## Overview
 
-            FROM node:18-alpine AS base
+This Dockerfile builds a lightweight and production-ready Docker image for a Node.js application. It uses a multi-stage build process to ensure smaller image size by separating the build dependencies from the final runtime image.
 
-*)The FROM instruction in a Dockerfile specifies the base image for the Docker build. It defines the starting point for creating a new image layer. In this case node 18 used as base image.
+---
 
-            RUN apk add --no-cache git
-            RUN apk --no-cache add --virtual builds-deps build-base python3
+## Dockerfile Details
 
-*) The RUN instruction is used to execute the command. --no-cache, which ensures the cache is not stored, technically it will free some space.
+### 1. Base Image
 
-            WORKDIR /app
-            COPY package.json ./
+- **Image Used**: `node:18-alpine`
+  - Lightweight Node.js image based on Alpine Linux.
 
-*) WORKDIR instruction, Sets the working directory to /app and copies the package.json file, which lists dependencies, into this directory.
+### 2. Multi-Stage Build
 
-            RUN npm i --legacy-peer-deps
+#### **Stage 1: Build Stage**
 
-*) Installs the dependencies with --legacy-peer-deps, which allows installing potentially incompatible peer dependencies without errors (useful if you’re dealing with dependency conflicts).
+- **Base Image**: `node:18-alpine`
+- **Purpose**: Install dependencies, build the application, and prepare the production-ready files.
+  
+**Steps:**
+1. Install required dependencies:
+   - Git (`apk add --no-cache git`)
+   - Build tools and Python for building native Node.js modules (`apk --no-cache add --virtual builds-deps build-base python3`).
+2. Set the working directory to `/app`.
+3. Copy the `package.json` file to the container.
+4. Install project dependencies using `npm i --legacy-peer-deps`.
+5. Copy the entire application source code to the container.
+6. Build the application using `npm run build`.
 
-            COPY . .
-            RUN npm run build
+---
 
-*) Copies the rest of the project files and runs the build command to generate production-ready files in a dist directory.
+#### **Stage 2: Final Stage**
 
-            FROM node:18-alpine
-            WORKDIR /app
+- **Base Image**: `node:18-alpine`
+- **Purpose**: Create a minimal image with only the production-ready files.
 
-*) Again uses the node:18-alpine image, keeping the final image lightweight by only including runtime essentials.
+**Steps:**
+1. Set the working directory to `/app`.
+2. Copy the `dist/` folder (build output), `node_modules/`, and `package.json` from the build stage.
+3. Expose port `5102` for the application.
+4. Set the `HOSTNAME` environment variable to `0.0.0.0`.
+5. Start the application using the `node dist/main.js` command.
 
-            COPY --from=base /app/dist ./dist
-            COPY --from=base /app/node_modules ./node_modules
-            COPY --from=base /app/package.json ./package.json
+---
 
-*) Copies only the essential files (dist, node_modules, and package.json) from the build stage. This minimizes the final image size since it excludes unnecessary build tools and source files.
+## Build and Run Instructions
 
-            EXPOSE 5102
-            ENV HOSTNAME "0.0.0.0"
+### Build the Image
 
-*) Exposes port 5102 for the application to accept incoming traffic and sets the hostname to 0.0.0.0, allowing the app to listen on all network interfaces.
+Run the following command to build the Docker image:
 
-            CMD ["node", "dist/main.js"]
-
-*) Specifies the command to start the Node.js application, running the main server file (dist/main.js) from the built files.
-
-*) In summary, this Dockerfile uses multi-stage builds to keep the final image compact by separating the build dependencies from the runtime environment.
-
+```bash
+docker build -t your-image-name .
